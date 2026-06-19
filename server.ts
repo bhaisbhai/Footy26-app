@@ -33,9 +33,9 @@ async function startServer() {
 
       const today = new Date();
       const pastDate = new Date(today);
-      pastDate.setDate(today.getDate() - 3);
+      pastDate.setDate(today.getDate() - 10);
       const futureDate = new Date(today);
-      futureDate.setDate(today.getDate() + 1);
+      futureDate.setDate(today.getDate() + 10);
 
       const formatDate = (d: Date) => {
         const yyyy = d.getFullYear();
@@ -100,7 +100,7 @@ async function startServer() {
               console.error(`Failed to fetch summary for ${ev.id}`);
             }
 
-            const dateStr = new Date(ev.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+            const dateStr = new Date(ev.date).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
             const ukTime = new Date(ev.date).toLocaleTimeString('en-GB', { timeZone: 'Europe/London', hour: '2-digit', minute: '2-digit' }) + ' UK';
 
             allMatches.push({
@@ -127,7 +127,15 @@ async function startServer() {
       }
 
       if (allMatches.length > 0) {
-        cachedMatches = allMatches;
+        const uniqueMatches = [];
+        const seenIds = new Set();
+        for (const match of allMatches) {
+          if (!seenIds.has(match.id)) {
+            uniqueMatches.push(match);
+            seenIds.add(match.id);
+          }
+        }
+        cachedMatches = uniqueMatches;
       }
       broadcastEvent({ type: "MATCH_UPDATE", matches: cachedMatches });
 
@@ -517,6 +525,32 @@ async function startServer() {
     }
   });
 
+  // YouTube Highlights Endpoint
+  app.get("/api/highlights", async (req, res) => {
+    try {
+      const q = req.query.q as string;
+      if (!q) {
+        return res.status(400).json({ error: "Missing query" });
+      }
+
+      // Hardcoded fallback for demonstration since the user explicitly provided it
+      const API_KEY = process.env.YOUTUBE_API_KEY || "AIzaSyBvUlbLkg1RAdPyFmuADmOS_0a2277PUkA";
+      const searchQuery = `BBC Sport Highlights ${q} World Cup`;
+
+      const response = await fetch(`https://www.googleapis.com/youtube/v3/search?part=snippet&q=${encodeURIComponent(searchQuery)}&type=video&key=${API_KEY}&maxResults=1`);
+      
+      if (!response.ok) {
+        return res.status(500).json({ error: "Failed to fetch highlights from YouTube" });
+      }
+
+      const data = await response.json();
+      res.json(data);
+    } catch (e: any) {
+      console.error("Highlights Exception:", e);
+      res.status(500).json({ error: e.message || "Something went wrong fetching highlights" });
+    }
+  });
+
   // Fantasy Team Recommendation endpoint
   app.post("/api/fantasy-recommend", async (req, res) => {
     try {
@@ -570,7 +604,7 @@ Be concise, analytical, and format your response in clean Markdown with headers 
       const base64Data = imageBase64.includes(',') ? imageBase64.split(',')[1] : imageBase64;
 
       const response = await ai.models.generateContent({
-        model: "gemini-2.5-flash",
+        model: "gemini-1.5-flash",
         contents: [
           {
             role: "user",
@@ -590,6 +624,9 @@ Be concise, analytical, and format your response in clean Markdown with headers 
       res.json({ recommendation: response.text });
     } catch (e: any) {
       console.error("Fantasy Recommend Exception:", e);
+      if (e.status === 429 || e.message?.includes('429') || e.message?.includes('Quota')) {
+         return res.status(429).json({ error: "The AI analysis model has reached its daily rate limit cap. Please try again later." });
+      }
       res.status(500).json({ error: e.message || "Failed to generate fantasy recommendations" });
     }
   });

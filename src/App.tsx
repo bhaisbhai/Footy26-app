@@ -1,6 +1,6 @@
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState, useRef, useMemo } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { RefreshCw, Trophy, AlertCircle, Bell, Swords, ListOrdered, Newspaper, Network, Sparkles } from 'lucide-react';
+import { RefreshCw, Trophy, AlertCircle, Bell, Swords, ListOrdered, Newspaper, Network, Sparkles, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Match } from './types';
 import { MatchCard } from './components/MatchCard';
 import { Standings } from './components/Standings';
@@ -60,7 +60,8 @@ export default function App() {
       try {
         const data = JSON.parse(event.data);
         if (data.type === 'MATCH_UPDATE') {
-          setMatches(data.matches || []);
+          const localizedMatches = (data.matches || []).map((m: Match) => ({ ...m, date: new Date(m.timestamp || 0).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' }) }));
+          setMatches(localizedMatches);
           setLoading(false);
           setIsRefreshing(false);
           setError(null);
@@ -107,10 +108,34 @@ export default function App() {
     }
   };
 
-  const liveMatches = matches.filter(m => m.status === 'LIVE');
-  const upcomingMatches = matches.filter(m => m.status === 'UPCOMING')
+  const availableDates = useMemo(() => {
+    const dates = Array.from(new Set(matches.filter(m => m.date).map(m => m.date)));
+    dates.sort((a, b) => new Date(a).getTime() - new Date(b).getTime());
+    return dates;
+  }, [matches]);
+
+  const [selectedDate, setSelectedDate] = useState<string>('');
+
+  useEffect(() => {
+    if (availableDates.length > 0 && !selectedDate) {
+      const todayStr = new Date().toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
+      if (availableDates.includes(todayStr)) {
+        setSelectedDate(todayStr);
+      } else {
+        setSelectedDate(availableDates[0]);
+      }
+    }
+  }, [availableDates, selectedDate]);
+
+  const dateFilteredMatches = useMemo(() => {
+    if (!selectedDate) return matches;
+    return matches.filter(m => m.date === selectedDate);
+  }, [matches, selectedDate]);
+
+  const liveMatches = dateFilteredMatches.filter(m => m.status === 'LIVE');
+  const upcomingMatches = dateFilteredMatches.filter(m => m.status === 'UPCOMING')
     .sort((a, b) => (a.timestamp || 0) - (b.timestamp || 0));
-  const finishedMatches = matches.filter(m => m.status === 'FINISHED')
+  const finishedMatches = dateFilteredMatches.filter(m => m.status === 'FINISHED')
     .sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
 
   const handleToggleSubscription = async (id: string) => {
@@ -246,8 +271,38 @@ export default function App() {
 
         {/* Content Section */}
         {activeTab === 'MATCHES' && (
-          matches.length === 0 && loading ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div className="flex flex-col gap-8">
+            {availableDates.length > 0 && (
+              <div className="flex items-center justify-between bg-white/5 border border-white/10 p-2 rounded-2xl w-full max-w-md mx-auto backdrop-blur-sm mb-4">
+                <button 
+                  onClick={() => {
+                    const idx = availableDates.indexOf(selectedDate);
+                    if (idx > 0) setSelectedDate(availableDates[idx - 1]);
+                  }}
+                  disabled={availableDates.indexOf(selectedDate) <= 0}
+                  className="p-3 bg-transparent hover:bg-white/10 rounded-xl disabled:opacity-30 transition-colors cursor-pointer disabled:cursor-not-allowed"
+                >
+                  <ChevronLeft className="w-5 h-5 text-white" />
+                </button>
+                <div className="font-bold tracking-widest text-sm uppercase text-white px-4 flex flex-col items-center">
+                  <span>{selectedDate === new Date().toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' }) ? 'Today' : selectedDate}</span>
+                  <span className="text-[10px] text-white/40 mt-1">{dateFilteredMatches.length} Matches</span>
+                </div>
+                <button 
+                  onClick={() => {
+                    const idx = availableDates.indexOf(selectedDate);
+                    if (idx < availableDates.length - 1) setSelectedDate(availableDates[idx + 1]);
+                  }}
+                  disabled={availableDates.indexOf(selectedDate) >= availableDates.length - 1}
+                  className="p-3 bg-transparent hover:bg-white/10 rounded-xl disabled:opacity-30 transition-colors cursor-pointer disabled:cursor-not-allowed"
+                >
+                  <ChevronRight className="w-5 h-5 text-white" />
+                </button>
+              </div>
+            )}
+
+            {matches.length === 0 && loading ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {[1, 2, 3, 4, 5, 6].map((i) => (
                 <div key={i} className="h-44 rounded-[2rem] bg-white/5 backdrop-blur-xl border border-white/10 animate-pulse" />
               ))}
@@ -330,13 +385,14 @@ export default function App() {
                </section>
              )}
 
-             {!loading && matches.length === 0 && !error && (
+             {!loading && dateFilteredMatches.length === 0 && !error && (
                <div className="py-24 text-center border border-dashed border-white/10 rounded-[2.5rem] bg-white/5 backdrop-blur-xl">
-                  <p className="text-white/40 font-medium tracking-wide">No matches scheduled for today.</p>
+                  <p className="text-white/40 font-medium tracking-wide">No matches scheduled for {selectedDate}.</p>
                </div>
              )}
           </motion.div>
-          )
+          )}
+          </div>
         )}
 
         {/* Standings Section */}

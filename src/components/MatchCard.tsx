@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Match } from '../types';
-import { Bell, BellOff, ChevronDown, ChevronUp, Clock, Activity, Users } from 'lucide-react';
+import { Bell, BellOff, ChevronDown, ChevronUp, Clock, Activity, Users, PlayCircle } from 'lucide-react';
+import { MatchHighlights } from './MatchHighlights';
 import {
   Radar,
   RadarChart,
@@ -214,8 +215,13 @@ export function MatchCard({
                   <>
                     <button onClick={() => setActiveTab('STATS')} className={`px-4 py-1.5 rounded-lg text-xs font-bold tracking-widest transition-colors whitespace-nowrap flex items-center gap-2 ${activeTab === 'STATS' ? 'bg-white/10 text-white shadow-sm' : 'text-white/40 hover:text-white/80'}`}><Activity className="w-3" /> STATS</button>
                     <button onClick={() => setActiveTab('EVENTS')} className={`px-4 py-1.5 rounded-lg text-xs font-bold tracking-widest transition-colors whitespace-nowrap flex items-center gap-2 ${activeTab === 'EVENTS' ? 'bg-white/10 text-white shadow-sm' : 'text-white/40 hover:text-white/80'}`}><Clock className="w-3" /> EVENTS</button>
-                    <button onClick={() => setActiveTab('LINEUPS')} className={`px-4 py-1.5 rounded-lg text-xs font-bold tracking-widest transition-colors whitespace-nowrap flex items-center gap-2 ${activeTab === 'LINEUPS' ? 'bg-white/10 text-white shadow-sm' : 'text-white/40 hover:text-white/80'}`}><Users className="w-3" /> LINEUPS</button>
                   </>
+                )}
+                {(match.status !== 'UPCOMING' || (details?.rosters?.length > 0)) && (
+                    <button onClick={() => setActiveTab('LINEUPS')} className={`px-4 py-1.5 rounded-lg text-xs font-bold tracking-widest transition-colors whitespace-nowrap flex items-center gap-2 ${activeTab === 'LINEUPS' ? 'bg-white/10 text-white shadow-sm' : 'text-white/40 hover:text-white/80'}`}><Users className="w-3" /> LINEUPS</button>
+                )}
+                {match.status === 'FINISHED' && (
+                   <button onClick={() => setActiveTab('HIGHLIGHTS' as any)} className={`px-4 py-1.5 rounded-lg text-xs font-bold tracking-widest transition-colors whitespace-nowrap flex items-center gap-2 ${activeTab === 'HIGHLIGHTS' as any ? 'bg-white/10 text-white shadow-sm' : 'text-white/40 hover:text-white/80'}`}><PlayCircle className="w-3" /> HIGHLIGHTS</button>
                 )}
               </div>
 
@@ -412,6 +418,12 @@ export function MatchCard({
                         <div className="col-span-2 text-center text-white/30 text-xs py-8 font-mono">Lineups not available</div>
                       )}
                     </div>
+                  )}
+                  {/* HIGHLIGHTS VIEW */}
+                  {(activeTab as any) === 'HIGHLIGHTS' && (
+                     <div className="bg-white/5 border border-white/5 rounded-2xl p-6 flex flex-col items-center">
+                        <MatchHighlights matchName={`${match.homeTeam} vs ${match.awayTeam}`} />
+                     </div>
                   )}
                 </div>
               )}
